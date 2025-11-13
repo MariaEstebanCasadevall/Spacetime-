@@ -4,13 +4,16 @@ import numpy as np
 
 import sys
 sys.path.append('..')
+
+import curves
 from curves import CubicSpline
 
 # Gaussian mixture model
 
-original_means = torch.tensor([-2.5, 0.5, 2.5], dtype=torch.float32)
+original_means = torch.tensor([0, 0, 0], dtype=torch.float32)
 original_variance = torch.tensor(0.75 ** 2, dtype=torch.float32)
-weights = torch.tensor([0.275, 0.45, 0.275], dtype=torch.float32)
+weights = torch.tensor([1, 0, 0], dtype=torch.float32)
+
 
 # SDE parameters
 
@@ -31,10 +34,26 @@ def gaussian_mixture_density(x, t):
     """Analytical implementation of the marginal log-density at time t"""
     alpha_t, sigma_t = alpha_sigma(t)
     means_t = alpha_t[:, None] * original_means[None, :]
+
     variances_t = sigma_t[:, None]**2 + alpha_t[:, None]**2 * original_variance
     log_probs = torch.log(weights[None, :]) - 0.5 * (torch.log(2 * torch.pi * variances_t) + (x[:, None] - means_t)**2 / variances_t)
     log_p_t = torch.logsumexp(log_probs, dim=1)
     return log_p_t
+
+
+def gaussian_mixture_density2(x, t):
+
+    """Analytical implementation of the marginal log-density for a single Gaussian at time t"""
+    alpha_t, sigma_t = alpha_sigma(t)
+    
+    # Pick the first mean and variance (or whichever one you want)
+    mean_t = alpha_t * original_means[0]      # shape: (batch,)
+    variance_t = sigma_t**2 + (alpha_t**2) * original_variance[0]  # shape: (batch,)
+    
+    # Compute log-density
+    log_p_t = -0.5 * (torch.log(2 * torch.pi * variance_t) + (x - mean_t)**2 / variance_t)
+    return log_p_t
+
 
 def compute_vector_field(x, t):
     """Implementation of the PF-ODE vector field"""
@@ -207,4 +226,4 @@ def visualize_density(ax):
     X_flat = X.flatten()
     densities = gaussian_mixture_density(torch.from_numpy(X_flat), torch.from_numpy(T_flat)).reshape(X.shape).detach()
         
-    ax.contourf(T, X, np.exp(0.5 * densities).reshape(X.shape), levels=20, cmap='viridis', alpha=0.9)
+    ax.contourf(T, X, (densities).reshape(X.shape), levels=20, cmap='viridis', alpha=0.9)
